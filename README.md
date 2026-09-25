@@ -31,8 +31,13 @@ the current line for the whole slate and the game-day forecast — load when onl
   counts), ⏸ idle, 🪑 no touches this year, ◦ **no history** (freshman / walk-on / FCS transfer: priced from what such
   players typically produce — treat any "edge" as a guess), ↪ transfer with his previous school, ↩ returner, FR.
 - **Low-confidence rosters** get a ⚠ banner with the reasons (QB changes, thin history, FCS team, one game played).
-- **Your card, paste box, markets, parlays, slip, bet log** — same as the NFL app: paste FanDuel stacked boards
-  (name, then Anytime / 1st / Last); one price per name fills the selected market (use that for the 2+ board).
+- **Paste a FanDuel or DraftKings board** — both stack three prices under each name, but in a different order:
+  FanDuel is Anytime / 1st TD / **Last TD**, DraftKings is Anytime / 1st TD / **2+ TD**. The **Board layout** menu
+  auto-detects which one you pasted (DraftKings copy carries team tags like `(IND)` and "player image" lines; failing
+  that, the prices tell — a Last-TD price tracks the 1st-TD price, a 2+ price is shorter for the featured players) and
+  says what it read. Pick the layout yourself to override; changing it re-applies the same paste. One price per name
+  fills the selected market.
+- **Your card, markets, parlays, slip, bet log** — same as the NFL app.
   Books only list notable players; tick **show the whole roster** to see everyone the model prices.
 - **Bet log / slip / bankroll** live in your browser — move them between machines with ⬇ Export / ⬆ Import.
 

@@ -187,7 +187,13 @@
     <div class="panel" style="padding:12px;margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="font-weight:700;font-size:13px">⚡ Paste book odds — fills every row at once</div>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px;align-items:center">
+          <label class="muted" style="font-size:12px;display:flex;align-items:center;gap:6px" title="Which market each stacked price is. FanDuel: Anytime / 1st TD / Last TD. DraftKings: Anytime / 1st TD / 2+ TD. Auto reads it from the paste.">Board layout
+            <select id="boardFmt" class="statussel" style="font-size:12px;padding:4px 6px">
+              <option value="auto">Auto-detect</option>
+              <option value="fd">FanDuel · Anytime / 1st / Last</option>
+              <option value="dk">DraftKings · Anytime / 1st / 2+</option>
+            </select></label>
           <button class="btn" id="applyOdds" style="padding:7px 16px;font-size:13px">Apply</button>
           <button class="btn sec" id="clearOdds" style="padding:7px 14px;font-size:13px">Clear</button>
         </div>
@@ -197,10 +203,10 @@
         <button class="mktbtn" data-mkt="first">1st TD</button>
         <button class="mktbtn" data-mkt="last">Last TD</button>
         <button class="mktbtn" data-mkt="two">2+ TD</button>
-        <span class="muted">— a stacked Anytime/1st/Last paste fills all three at once; one price per name fills the selected market</span>
+        <span class="muted">— a stacked 3-price paste fills three markets at once (FanDuel: Anytime/1st/Last · DraftKings: Anytime/1st/2+); one price per name fills the selected market</span>
       </div>
       <textarea id="oddsPaste" rows="3" spellcheck="false"
-        placeholder="Paste your board (FanDuel stacked blocks work). Name, then Anytime / 1st / Last on their own lines:&#10;Arch Manning&#10;+140&#10;+900&#10;+950&#10;→ fills Anytime, 1st TD & Last TD together. One price per name fills the selected market (use that for the 2+ board)."
+        placeholder="Paste a FanDuel or DraftKings board. Name, then the prices on their own lines:&#10;Arch Manning        (FanDuel: Anytime / 1st / Last)     Charlie Becker (IND)   (DraftKings: Anytime / 1st / 2+)&#10;+140                                                    −200&#10;+900                                                    +450&#10;+950                                                    +290&#10;The layout is detected automatically (or pick it above). One price per name fills the selected market."
         style="width:100%;margin-top:9px;background:var(--panel2);color:var(--ink);border:1px solid var(--line2);border-radius:10px;padding:10px;font-family:var(--mono);font-size:13px;resize:vertical"></textarea>
       <div id="oddsMsg" class="legend" style="margin-top:7px"></div>
     </div>
@@ -637,7 +643,7 @@ function setLine(live){
   if(pk) $('spread').value=0; else { $('favSel').value=g.fav; $('spread').value=Math.abs(g.spread); }
   el.innerHTML=`${live?'📈 live':'📉'} line: <b>${pk?'pick\'em':esc(T(g.fav).short)+' -'+Math.abs(g.spread)}</b> · O/U <b>${g.total}</b> <span class="muted">${live&&LIVE_AT?'(ESPN, just now — edit if your book differs)':'(from the snapshot — refreshing…)'}</span>`;
 }
-function clearOddsBoard(){ if(LAST) LAST.bookMap={}; sgpMap={}; $('oddsPaste').value=''; $('oddsMsg').textContent=''; }
+function clearOddsBoard(){ if(LAST) LAST.bookMap={}; sgpMap={}; lastPaste=null; $('oddsPaste').value=''; $('oddsMsg').textContent=''; }
 function onMatchupChange(){ clearOddsBoard(); refreshFav(); syncGameSel(); setLine(!!LIVE_AT); setWeather(); run(); }
 $('awaySel').onchange=onMatchupChange;
 $('homeSel').onchange=onMatchupChange;
@@ -1236,23 +1242,49 @@ function cleanName(s){
     .replace(/\b(anytime|touchdown|to score|scorer|player|market|odds)\b/gi,' ')
     .replace(/\d{2,6}/g,' ').replace(/[|•·,()]/g,' ').replace(/\s+/g,' ').trim();
 }
+// Reads a pasted board into [{name, tag, prices, raw}]. Works for FanDuel stacked blocks (name, then prices) and
+// DraftKings copy (name with a team tag like "Charlie Becker (IND)", prices, and "player image" alt-text lines).
 function parseOddsBlock(text){
-  const out=[]; let cur=null;
+  const out=[]; let cur=null; out.imageLines=0;
   const flush=()=>{ if(cur && cur.name && cur.prices.length) out.push(cur); cur=null; };
   for(let line of text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean)){
+    if(/^(player\s+)?image$/i.test(line)){ out.imageLines++; continue; }        // DraftKings headshot alt text
     const oddsAll=[...line.matchAll(ODDS_RE)].map(m=>oddsFromToken(m[0])).filter(v=>v!=null);
     const lettersLeft=/[a-z]/i.test(line.replace(ODDS_RE,''));
     if(lettersLeft){
       if(!oddsAll.length && /^(any\s?time|1st|first|last|2\+|touchdown\s*scorer|scorer|player|market|to score|more|show)\b/i.test(line)){ flush(); continue; }
       flush();
-      const name=cleanName(line);
-      cur = name ? { name, prices: oddsAll.slice(), raw: line } : null;
+      const tm=line.match(/\(([A-Za-z&.]{2,6})\)\s*$/), tag=tm?tm[1].toUpperCase():null;
+      const name=cleanName(tm?line.slice(0,tm.index):line);
+      cur = name ? { name, tag, prices: oddsAll.slice(), raw: line } : null;
     } else if(oddsAll.length && cur) cur.prices.push(...oddsAll);
   }
   flush();
   return out;
 }
-function marketsForCount(n){ if(n>=4) return ['anytime','first','last','two']; if(n===3) return ['anytime','first','last']; if(n===2) return ['anytime','first']; return [MARKET]; }
+// Stacked prices map to markets by position. FanDuel: Anytime / 1st TD / Last TD. DraftKings: Anytime / 1st TD / 2+ TD.
+// A lone price fills whatever market is selected.
+const LAYOUT={fd:{label:'FanDuel', third:'last'}, dk:{label:'DraftKings', third:'two'}};
+function marketsForCount(n, fmt){
+  const third=(LAYOUT[fmt]||LAYOUT.fd).third;
+  if(n>=4) return ['anytime','first',third,third==='last'?'two':'last'];
+  if(n===3) return ['anytime','first',third];
+  if(n===2) return ['anytime','first'];
+  return [MARKET];
+}
+// Which layout is this paste? Your pick in the menu wins; otherwise the copy itself says (DraftKings carries team
+// tags and "player image" lines, FanDuel doesn't); otherwise the prices do — FanDuel's Last-TD price is never much
+// shorter than its 1st-TD price, while DraftKings' 2+ price usually IS shorter for the featured players.
+function detectLayout(parsed){
+  const pick=$('boardFmt').value;
+  if(pick==='fd'||pick==='dk') return {fmt:pick, why:'set in the Board layout menu'};
+  const tagged=parsed.filter(e=>e.tag).length;
+  if(parsed.imageLines>=2 || tagged>=Math.max(2, parsed.length/2)) return {fmt:'dk', why:'team tags / player-image lines in the paste'};
+  const three=parsed.filter(e=>e.prices.length>=3 && americanToProb(e.prices[0])>=0.35);
+  const shorter=three.filter(e=>americanToProb(e.prices[2])>1.08*americanToProb(e.prices[1])).length;
+  if(three.length>=2 && shorter>=2 && shorter>=three.length/2) return {fmt:'dk', why:`the 3rd price is shorter than the 1st-TD price for ${shorter} of ${three.length} featured players — that's a 2+ TD line`};
+  return {fmt:'fd', why:three.length?'the 3rd prices track the 1st-TD prices (Last TD)':'default'};
+}
 function buildPlayerIndex(){
   const byFull=new Map(), byIL=new Map(), byLast=new Map();
   const push=(m,k,p)=>{ if(!k)return; let a=m.get(k); if(!a){a=[];m.set(k,a);} a.push(p); };
@@ -1267,12 +1299,14 @@ function buildPlayerIndex(){
 }
 // several players can share a surname on a college roster: prefer the one with a real role
 function onlyOrBest(list){ if(!list||!list.length) return null; if(list.length===1) return list[0]; const s=list.slice().sort((a,b)=>b.anytime-a.anytime); return s[0].anytime>=3*(s[1].anytime||0.0001)?s[0]:null; }
-function matchPlayer(raw,idx){
+function matchPlayer(raw,idx,tag){
   const n=normName(raw); if(idx.byFull.has(n)) return idx.byFull.get(n);
   const toks=raw.trim().split(/\s+/).filter(Boolean); if(!toks.length) return null;
   let li=toks.length-1; if(li>0 && /^(jr|sr|ii|iii|iv|v)\.?$/i.test(toks[li])) li--;
   const last=normName(toks[li]), il=(toks[0][0]||'').toLowerCase()+last;
-  return onlyOrBest(idx.byIL.get(il)) || onlyOrBest(idx.byLast.get(last)) || (li>=1?onlyOrBest(idx.byLast.get(normName(toks[li-1]+toks[li]))):null);
+  // a book's team tag ("(IND)") settles a shared surname when it matches our abbreviation
+  const byTag=list=>{ if(!tag||!list||list.length<2) return list; const f=list.filter(p=>T(p._team).abbr===tag); return f.length?f:list; };
+  return onlyOrBest(byTag(idx.byIL.get(il))) || onlyOrBest(byTag(idx.byLast.get(last))) || (li>=1?onlyOrBest(byTag(idx.byLast.get(normName(toks[li-1]+toks[li])))):null);
 }
 function applyPastedOdds(){
   if(!LAST) return;
@@ -1280,32 +1314,47 @@ function applyPastedOdds(){
   if(!parsed.length){ $('oddsMsg').innerHTML='<span style="color:var(--warn)">Nothing to read — paste a player name then a price on each line.</span>'; return; }
   const idx=buildPlayerIndex(), used=new Set(), unmatched=[], touched=new Set(); let filled=0;
   const fmt=v=>(v>0?'+':'')+v;
+  const layout=detectLayout(parsed), keys=[];
+  const put=(k,v)=>{ LAST.bookMap[k]=v; keys.push(k); };
   const teamHit=nn=>[LAST.away,LAST.home].find(t=>[T(t).short,T(t).name,T(t).abbr,T(t).mascot].filter(Boolean).some(x=>normName(x)&&nn.includes(normName(x))));
-  for(const {name,prices,raw} of parsed){
+  for(const {name,tag,prices,raw} of parsed){
     if(!prices.length) continue;
     const nn=normName(name), dst=teamHit(nn);
-    if(dst && /d.?st|def/i.test(raw)){
-      marketsForCount(prices.length).forEach((mk,i)=>{ if(mk!=='two'&&prices[i]!=null){ LAST.bookMap[mk+'|DST|'+dst]=fmt(prices[i]); touched.add(mk); } });
+    if(dst && /d.?st|def/i.test(raw)){   // defenses have no 2+ market, so a DraftKings 3rd price is skipped
+      marketsForCount(prices.length, layout.fmt).forEach((mk,i)=>{ if(mk!=='two'&&prices[i]!=null){ put(mk+'|DST|'+dst, fmt(prices[i])); touched.add(mk); } });
       filled++; continue;
     }
-    const p=matchPlayer(name,idx);
+    const p=matchPlayer(name,idx,tag);
     if(p && !used.has(p._key)){ used.add(p._key);
-      marketsForCount(prices.length).forEach((mk,i)=>{ if(prices[i]!=null){ LAST.bookMap[mk+'|'+p._key]=fmt(prices[i]); touched.add(mk); } });
+      marketsForCount(prices.length, layout.fmt).forEach((mk,i)=>{ if(prices[i]!=null){ put(mk+'|'+p._key, fmt(prices[i])); touched.add(mk); } });
       filled++; continue; }
     unmatched.push(raw||name);
   }
+  lastPaste={text:$('oddsPaste').value, keys};
   renderPlayers(); renderDST(); computeParlays(); refreshSlipAdder(); refreshBetForm();
   const lbl=['anytime','first','last','two'].filter(m=>touched.has(m)).map(m=>MKT[m].label).join(', ');
-  $('oddsMsg').innerHTML=`Filled <b>${filled}</b> ${filled===1?'player':'players'}${lbl?` across <b>${lbl}</b>`:''}.`+
+  const stacked=parsed.some(e=>e.prices.length>=3);
+  $('oddsMsg').innerHTML=(stacked?`Read as <b>${LAYOUT[layout.fmt].label}</b> (Anytime · 1st TD · ${MKT[LAYOUT[layout.fmt].third].label}) — ${esc(layout.why)}. <span class="muted">Wrong? Change <b>Board layout</b> and it re-applies.</span><br>`:'')+
+    `Filled <b>${filled}</b> ${filled===1?'player':'players'}${lbl?` across <b>${lbl}</b>`:''}.`+
     (unmatched.length?` <span style="color:var(--warn)">Couldn't match:</span> ${unmatched.slice(0,12).map(u=>`<code>${esc(u)}</code>`).join(' · ')}${unmatched.length>12?' …':''}`:' ✓');
+}
+// switching the layout re-reads the SAME paste: undo what it filled, then apply it again with the new mapping
+let lastPaste=null;
+function onBoardFmtChange(){
+  try{ localStorage.setItem('cfbtd_boardfmt', $('boardFmt').value); }catch(e){}
+  if(!LAST || !lastPaste || lastPaste.text!==$('oddsPaste').value) return;
+  lastPaste.keys.forEach(k=>delete LAST.bookMap[k]);
+  applyPastedOdds();
 }
 function clearAllOdds(){
   if(LAST){ Object.keys(LAST.bookMap).forEach(k=>{ if(k.startsWith(MARKET+'|')) delete LAST.bookMap[k]; }); renderPlayers(); renderDST(); computeParlays(); refreshSlipAdder(); }
-  $('oddsPaste').value=''; $('oddsMsg').textContent='';
+  $('oddsPaste').value=''; $('oddsMsg').textContent=''; lastPaste=null;
 }
 
 // ---------- wiring ----------
 $('applyOdds').onclick=applyPastedOdds;
+try{ const bf=localStorage.getItem('cfbtd_boardfmt'); if(bf&&LAYOUT[bf]||bf==='auto') $('boardFmt').value=bf; }catch(e){}
+$('boardFmt').onchange=onBoardFmtChange;
 $('clearOdds').onclick=clearAllOdds;
 $('findParlays').onclick=computeParlays;
 $('parlayLegs').onchange=computeParlays;

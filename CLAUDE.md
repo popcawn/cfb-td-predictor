@@ -94,7 +94,10 @@ See README.md for what the app does and how it was validated.
   season gets the ×0.15 idle factor and reads ~1%.
 - Return-only players (DBs who return kicks) have no offensive touches → not 'no history'; tagged ↩ returner only.
 - Wide tables sit in `.tscroll` so the page stays phone-width (a 980px table was widening the mobile layout viewport).
-- Storage keys `cfbtd_bets` / `cfbtd_slip` / `cfbtd_bankroll`; export app id `cfb-td-predictor`; bets/slip legs store
+- Paste box reads FanDuel (Anytime/1st/Last) and DraftKings (Anytime/1st/2+) stacks: `detectLayout()` = menu pick >
+  DK text cues (`(IND)` team tags, "player image" lines) > price shape (3rd price >8% shorter than 1st for most
+  featured players = 2+). A DraftKings 3rd price on a D/ST is dropped (no defense 2+ market).
+- Storage keys `cfbtd_bets` / `cfbtd_slip` / `cfbtd_bankroll` / `cfbtd_boardfmt`; export app id `cfb-td-predictor`; bets/slip legs store
   `gameLbl` because next week's snapshot may not contain last week's FCS opponent.
 
 ## Rules carried over from the NFL build (non-negotiable)
