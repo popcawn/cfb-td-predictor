@@ -84,6 +84,9 @@ each kept only because it improved the backtest on both halves of the season:
 - **Availability from usage recency** (no injury feed): idle last game ×0.4, 2+ games ×0.3, none all season ×0.15.
 - **Players with no history** get the *measured* production of history-less rostered players (most never touch the
   ball) instead of a replacement-level guess.
+- **TD rates shrunk toward the league rate** per carry / per target (20 pseudo-opportunities) — 3 TDs on 7 targets
+  counts for far less than 3 on 70. Low-volume players who'd scored well above their volume were over-rated
+  (31.7% predicted vs 27.3% actual); with the shrink it's 29.2% vs 27.3%.
 - **Deep backups** (<2 touches/game) calibrated ×0.7 (cross-fitted).
 
 **Defense** props pay on **defensive TDs only** (pick-6, fumble return): league rate × e^(0.02 × points favored) ×
@@ -97,10 +100,10 @@ correction.
 ## Honesty & calibration
 Backtest: trained on 2024, then **every 2025 FBS game (932)** predicted using only data from before it, anchored to
 the real closing line, running the app's exact math.
-- Players who touched the ball (actives known): **Brier 0.1505 vs 0.1677** base rate → **10.2% skill**, log loss 0.477,
+- Players who touched the ball (actives known): **Brier 0.1500 vs 0.1677** base rate → **10.5% skill**, log loss 0.475,
   reliability on the diagonal.
-- Whole rosters (what the app prices): 19.9% skill (flattered by many easy zeros).
-- On the players ESPN BET actually listed (291 games, weeks 1–9): Brier 0.1756 vs 0.1916 (8.4% skill). The book listed
+- Whole rosters (what the app prices): 20.0% skill (flattered by many easy zeros).
+- On the players ESPN BET actually listed (291 games, weeks 1–9): Brier 0.1751 vs 0.1916 (8.6% skill). The book listed
   only **72% of actual scorers** — college boards skip a lot of players who score.
 - Defense TDs: better than league average on both halves of 2025.
 - Known limits: 2+ TD runs a little hot in the middle of the range; players with no history are still over-rated

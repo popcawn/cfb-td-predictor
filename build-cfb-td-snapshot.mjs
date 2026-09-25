@@ -94,6 +94,8 @@ const MODEL = {
   priorScale: 1,       // scales the shrinkage target (prior) — the NFL-sized prior may inflate deep backups
   gt: 0,               // garbage time: flatten a team's TD shares toward the depth chart as |spread| grows past gtFrom
   gtFrom: 7, gtSide: 'both',
+  tdShrink: 20,        // pull each player's TD rate per carry/target toward league with 20 pseudo-opportunities  [helps H1+H2, both sets]
+                       //   (low-volume 'hot hands' were over-rated 31.7->27.3%; 40 borderline, 80 worse)
   roleCalTiers: ['fringe'],   // usage tiers whose probabilities get the cross-fitted actual/predicted correction [fringe helps H1+H2]
 };
 const SEASON_WEIGHT = {};
@@ -732,7 +734,8 @@ async function checkTDs(season) {
               const ch = CFBModel.channels(ag, bk, M, Cb), li = lastIdx.get(pid + '|' + team);
               cands.push({ pid, bk, rush: ch.rush, rec: ch.rec, ret: ag ? ag.kr + ag.pr : 0, gamesAgo: li == null ? null : tc.n - 1 - li,
                 touchPg: ag && ag.g ? (ag.rushAtt - ag.kneel + ag.tgt) / ag.g : 0, hasHist: !!(ag && ag.g > 0), qbStarter: null,
-                dropCur: c ? c.drop : 0, dropAll: ag ? ag.drop : 0 });
+                dropCur: c ? c.drop : 0, dropAll: ag ? ag.drop : 0,
+                opp: ag ? Math.max(0, ag.rushAtt - ag.kneel) + ag.tgt : 0, tdx: ag ? (ag.rushTD + ag.recTD) - (Math.max(0, ag.rushAtt - ag.kneel) * Cb.RUSHTDATT + ag.tgt * Cb.TGTTD) : 0 });
             }
             const qs = qbState.get(team), qbs = cands.filter(c => c.bk === 'QB');
             const st = pickStarterQB(qbs.map(c => ({ id: c.pid, isLast: !!qs && qs.last === c.pid, led: qs ? qs.led.get(c.pid) || 0 : 0, dropCur: c.dropCur, dropAll: c.dropAll })));
@@ -749,7 +752,7 @@ async function checkTDs(season) {
             const c = s.cands[i], x = s.res[i], pg = pgIndex.get(c.pid + '|' + g.gid);
             const n = pg && pg.team === s.team ? pg.rushTD + pg.recTD + pg.stTD : 0;
             rows.push({ gid: g.gid, pid: c.pid, team: s.team, wk, p: x.p, p2: x.p2, y: n > 0 ? 1 : 0, y2: n >= 2 ? 1 : 0, bk: c.bk, tier: x.tier,
-              margin: s.margin, fcs: !FBS[TEST_SEASON].has(s.team), hist: c.hasHist, qbS: c.qbStarter, ago: c.gamesAgo,
+              margin: s.margin, fcs: !FBS[TEST_SEASON].has(s.team), hist: c.hasHist, qbS: c.qbStarter, ago: c.gamesAgo, opp: c.opp, tdx: c.tdx,
               pF: (1 - P0) * (x.expOff + x.expST) / E, yF: first && first.pid === c.pid && first.team === s.team ? 1 : 0 });
           }
         }
@@ -786,8 +789,8 @@ async function checkTDs(season) {
       const base = { ...MODEL };
       const bri = (o, cand, h) => brierOf(runBacktest({ ...o, cand, wk: h }));
       // final confirmation pass: neighbours of every shipped value (none should win on both halves of the set it's judged on)
-      const flips = [['qbRush', 1.2], ['qbRush', 1.6], ['qbBackup', 0.15], ['qbBackup', 0.45], ['kSlope', 0], ['kSlope', 0.1], ['nbSize', 4], ['nbSize', 6],
-        ['aNone', 0.3], ['a1', 0.6], ['avail', false], ['newPrior', 'fixed'], ['eps', 0.005], ['eps', 0.02], ['gt', 0.2], ['weather', true], ['wPrior', 0.5], ['recVol', 'rec'], ['air', true]];
+      // confirmation pass after adding tdShrink: neighbours of the other tuned values
+      const flips = [['tdShrink', 10], ['tdShrink', 30], ['qbRush', 1.2], ['qbRush', 1.6], ['kSlope', 0], ['kSlope', 0.1], ['nbSize', 4], ['nbSize', 6], ['qbBackup', 0.45], ['aNone', 0.3], ['a1', 0.6], ['shrinkGames', 6], ['eps', 0.005]];
       const sg = d => (d >= 0 ? '+' : '') + d.toFixed(5);
       const MIN_GAIN = 0.00003;   // a flip must beat the current model by at least this on each half (smaller = noise)
       const baseB = {}; for (const cand of ['touched', 'full']) baseB[cand] = [bri(base, cand, H1), bri(base, cand, H2)];
@@ -802,6 +805,9 @@ async function checkTDs(season) {
       }
       btOut.experiments = exp.map(e => ({ k: e.k, v: e.v, touched: e.touched.map(x => +x.toFixed(6)), full: e.full.map(x => +x.toFixed(6)) }));
       const rt = runBacktest({ ...base, cand: 'touched' }), rf = runBacktest({ ...base, cand: 'full' });
+      const hotKey = r => r.bk === 'QB' || r.opp == null ? null : r.opp >= 60 ? null : r.tdx >= 1.5 ? 'low volume, scored well ABOVE volume' : r.tdx <= -0.5 ? 'low volume, scored below volume' : 'low volume, about as expected';
+      log(`  hot-hand check [touched] (under 60 carries+targets of history): ${fmtCal(groupCal(rt, hotKey))}`);
+      for (const k of [20, 40]) log(`    same with tdShrink ${k}: ${fmtCal(groupCal(runBacktest({ ...base, tdShrink: k, cand: 'touched' }), hotKey))}`);
       log(`  by position [touched]: ${fmtCal(groupCal(rt, r => r.bk))}`);
       log(`  by usage tier [touched]: ${fmtCal(groupCal(rt, r => r.tier))}`);
       log(`  by usage tier [full]: ${fmtCal(groupCal(rf, r => r.tier))}`);

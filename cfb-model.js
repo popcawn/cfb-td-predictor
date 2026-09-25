@@ -52,13 +52,19 @@ var CFBModel = (function () {
     var d = a.g + M.shrinkGames;
     var sp = M.shrinkPrior ? M.ps * M.shrinkGames / d * (M.priorScale || 1) : 0;
     var carries = a.rushAtt - (M.noKneel ? a.kneel : 0);
-    var rush = 0.40 * a.rushTD / d + 0.40 * (a.glCarry / d) * C.GLCONV + pr.rush * sp;
+    // Realized TDs per game. With tdShrink > 0, a player's TD rate per carry / per target is pulled toward the league
+    // rate by tdShrink pseudo-opportunities, then multiplied by his opportunities per game — so 3 TDs on 7 targets
+    // counts for far less than 3 TDs on 70 (a hot streak on tiny volume is mostly luck).
+    var k = M.tdShrink || 0;
+    var rushTDg = k ? (a.rushTD + k * C.RUSHTDATT) / (Math.max(0, carries) + k) * Math.max(0, carries) / d : a.rushTD / d;
+    var recTDg = k ? (a.recTD + k * C.TGTTD) / (a.tgt + k) * a.tgt / d : a.recTD / d;
+    var rush = 0.40 * rushTDg + 0.40 * (a.glCarry / d) * C.GLCONV + pr.rush * sp;
     var carry = 0.20 * (carries / d) * C.RUSHTDATT * (bk === 'QB' ? M.qbCarry : 1);
     // pass-volume term: targets, or catches (2023-24 incompletions rarely name the receiver)
     var vol = M.recVol === 'rec' ? (a.rec / d) * C.RECTD : (a.tgt / d) * C.TGTTD;
     // air yards per target that HAS air yards (so seasons without the field don't read as zero depth)
     var air = M.air && a.airTgt > 0 ? (a.airY / a.airTgt) * (a.tgt / d) * C.AIRYDTD : 0;
-    var rec = 0.35 * a.recTD / d + 0.35 * (a.rzTgt / d) * C.RZTGTCONV + (M.air ? 0.20 : 0.30) * vol + (M.air ? 0.10 * air : 0) + pr.rec * sp;
+    var rec = 0.35 * recTDg + 0.35 * (a.rzTgt / d) * C.RZTGTCONV + (M.air ? 0.20 : 0.30) * vol + (M.air ? 0.10 * air : 0) + pr.rec * sp;
     // college QBs run far more (and score more on the ground) than their usage profile alone says
     var qr = bk === 'QB' ? (M.qbRush || 1) : 1;
     return { rush: (rush + carry) * qr + M.eps, rec: rec + M.eps };

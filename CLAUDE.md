@@ -72,12 +72,15 @@ See README.md for what the app does and how it was validated.
   **full** (+ the team's whole skill roster — what the app prices, since college has no injury feed).
 - Switch rule: `BT_EXPERIMENTS=1`; a flip must beat the current model by ≥0.00003 Brier on BOTH halves (wk 1–7, 8+).
   Depth/availability switches are judged on **full**; they always "win" on touched because touched already knows who played.
-- Headline: touched Brier 0.1505 vs 0.1677 base (10.2% skill), log loss 0.477, reliability on the diagonal (low bin
-  5→9%); full 0.0526 vs 0.0657 (19.9%, inflated by easy zeros — quote touched); market universe (ESPN BET boards,
-  291 games wk 1–9) 0.1756 vs 0.1916 (8.4%), book listed only 72% of actual scorers (~15 players/game).
+- Headline: touched Brier 0.1500 vs 0.1677 base (10.5% skill), log loss 0.475, reliability on the diagonal (low bin
+  5→9%); full 0.0525 vs 0.0657 (20.0%, inflated by easy zeros — quote touched); market universe (ESPN BET boards,
+  291 games wk 1–9) 0.1751 vs 0.1916 (8.6%), book listed only 72% of actual scorers (~15 players/game).
 - Kept: measured new-player prior (`newPrior:'emp'`), usage-recency availability (aNone 0.15 / a1 0.4 / a2 0.3),
   kSlope 0.05 (big favorites convert implied points to TDs better), QB rushing ×1.4 (+ qbCarry 1.3), backup QB 0.3,
-  NB shape 5, role calibration for the 'fringe' tier only (×0.7, cross-fitted).
+  NB shape 5, role calibration for the 'fringe' tier only (×0.7, cross-fitted), and (added after launch) tdShrink 20:
+  TD rate per carry/target shrunk toward league with 20 pseudo-opportunities — low-volume 'hot hands' were over-rated
+  31.7→27.3%, now 29.2→27.3%; helped both halves on both sets (10 and 30 no better; 40 borderline, 80 worse). The
+  harness's hot-hand check (`BT_EXPERIMENTS=1`) prints that calibration.
 - Rejected: garbage-time flattening (helps only if you know which backups play; hurts the full roster — and big
   favorites' starters actually score MORE than the base model said), weather (within noise → off, shown as context),
   targets-vs-catches, air yards, other wPrior/shrink/eps values, a 2+ TD factor (cross-fit disagrees by set).
