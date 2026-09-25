@@ -31,6 +31,7 @@ See README.md for what the app does and how it was validated.
 - `node build-cfb-td-snapshot.mjs` (Node 18+, curl). ~1 min. First run downloads ~2 GB into `%TEMP%\cfb_cache`
   (override `CFB_CACHE_DIR`); completed seasons are cached forever, the current season re-downloads every run.
 - Dev loop: `NO_REFRESH=1 SKIP_LOGOS=1 node build-cfb-td-snapshot.mjs` (~25 s, no current-season re-download).
+  **Never commit a SKIP_LOGOS build** — it ships the app without logos; rebuild without it before committing.
 - Default seasons 2023 2024 2025 2026: newest = current, newest-1 = backtest test, newest-2 = train (2023 = extra
   low-weight history + lets the build tell who was genuinely new in 2024). `BT_EXPERIMENTS=1` runs the switch harness.
 - Template-only change: `node inject.mjs` re-injects the existing snapshot + model and parse-checks every script.
