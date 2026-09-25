@@ -1,0 +1,53 @@
+name: Refresh data
+
+# Rebuilds the snapshot on GitHub's servers and commits it, so the GitHub Pages copy stays current without any PC
+# being on. (Lines for the whole slate also refresh live inside the app; there is no college injury feed to pull.)
+on:
+  schedule:
+    - cron: '0 15 * * 0'   # Sunday 15:00 UTC — Saturday's games are in the play-by-play; the picker moves to next week
+    - cron: '0 15 * * 4'   # Thursday 15:00 UTC — midweek roster / QB changes before the Thu-Sat games
+  workflow_dispatch:        # "Run workflow" button on the repo's Actions tab
+  push:
+    paths: ['.github/workflows/refresh.yml']   # runs once whenever this file changes
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Completed seasons' play-by-play never changes (~2 GB), so it lives in one fixed-key cache that is restored every
+      # run and never re-saved; the build re-downloads the current season itself. Bump the key when a new season starts
+      # (so the season that just finished gets cached too).
+      - name: Restore play-by-play cache
+        uses: actions/cache@v4
+        with:
+          path: ~/cfb_cache
+          key: cfb-history-2026-v1
+
+      - name: Build snapshot
+        env:
+          CFB_CACHE_DIR: /home/runner/cfb_cache
+        run: node --max-old-space-size=6144 build-cfb-td-snapshot.mjs
+
+      - name: Commit refreshed data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add cfb-td-predictor.html cfb-td-snapshot.json venues.json
+          if git diff --cached --quiet; then echo "No data changes."; exit 0; fi
+          git commit -m "Data refresh $(date -u +%Y-%m-%d)"
+          git pull --rebase origin main
+          git push

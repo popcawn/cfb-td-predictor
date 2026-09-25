@@ -1,0 +1,5 @@
+# runtime / scratch — not part of the app
+refresh.log
+*.log
+*.part
+node_modules/
