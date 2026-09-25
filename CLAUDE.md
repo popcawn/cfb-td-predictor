@@ -23,7 +23,8 @@ See README.md for what the app does and how it was validated.
 - **Data refresh runs on GitHub Actions** (`.github/workflows/refresh.yml`, Sun + Thu 15:00 UTC, + Run workflow button)
   and commits the rebuilt html/json/venues — so **`git pull` before starting work**, or pushes conflict on those files.
   The runner restores a fixed-key cache of completed seasons (`cfb-history-2026-v1`); **bump the key when a new season
-  starts** so the season that just finished gets cached. `gh` isn't installed: read run status from
+  starts** so the season that just finished gets cached — and at the same time roll the default `SEASONS` list in
+  the build forward a year (2024–2027 for the 2027 season) and scrape `node build-market-lines.mjs <new test season>`. `gh` isn't installed: read run status from
   https://api.github.com/repos/popcawn/cfb-td-predictor/actions/runs (public).
 
 ## Build / dev loop
