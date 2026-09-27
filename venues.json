@@ -399,6 +399,14 @@
   "lon": -104.30059,
   "indoor": false
  },
+ "3714": {
+  "name": "Fargodome",
+  "city": "Fargo",
+  "state": "ND",
+  "lat": 46.87719,
+  "lon": -96.7898,
+  "indoor": true
+ },
  "3715": {
   "name": "Flagler Credit Union Stadium",
   "city": "Boca Raton",
@@ -1285,6 +1293,14 @@
   "state": "CA",
   "lat": 32.71571,
   "lon": -117.16472,
+  "indoor": false
+ },
+ "11823": {
+  "name": "Ryan Field",
+  "city": "Evanston",
+  "state": "IL",
+  "lat": 42.04114,
+  "lon": -87.69006,
   "indoor": false
  }
 }
