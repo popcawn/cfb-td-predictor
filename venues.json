@@ -455,6 +455,14 @@
   "lon": -96.80667,
   "indoor": false
  },
+ "3738": {
+  "name": "Gillette Stadium",
+  "city": "Foxborough",
+  "state": "MA",
+  "lat": 42.06538,
+  "lon": -71.24783,
+  "indoor": false
+ },
  "3739": {
   "name": "Glass Bowl",
   "city": "Toledo",
